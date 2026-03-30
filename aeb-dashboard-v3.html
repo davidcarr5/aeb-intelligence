@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEB Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #F4F5F7; --card: #fff; --border: #E5E7EB;
+    --blue: #2563EB; --green: #059669; --purple: #7C3AED;
+    --amber: #D97706; --red: #DC2626; --aeb: #5B7E2A;
+    --text: #111827; --muted: #6B7280; --sidebar-w: 200px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  #sidebar {
+    width: var(--sidebar-w); background: #1E2433; color: #fff; position: fixed;
+    top: 0; left: 0; height: 100vh; display: flex; flex-direction: column; z-index: 100; overflow-y: auto;
+  }
+  .sb-logo { padding: 20px 16px; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .sb-logo span { font-size: 11px; color: rgba(255,255,255,.5); display: block; margin-top: 2px; }
+  .sb-logo strong { font-size: 15px; letter-spacing: -0.3px; }
+  .sb-nav { padding: 12px 0; flex: 1; }
+  .sb-section { padding: 6px 16px 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,.35); font-weight: 600; }
+  .sb-link {
+    display: flex; align-items: center; gap: 10px; padding: 9px 16px;
+    color: rgba(255,255,255,.65); text-decoration: none; font-size: 13px; cursor: pointer;
+    transition: all .15s; border-left: 3px solid transparent;
+  }
+  .sb-link:hover { color: #fff; background: rgba(255,255,255,.06); }
+  .sb-link.active { color: #fff; background: rgba(255,255,255,.1); border-left-color: var(--aeb); }
+  .sb-icon { font-size: 15px; width: 18px; text-align: center; }
+  .sb-badge { margin-left: auto; background: var(--aeb); color: #fff; font-size: 10px; padding: 1px 6px; border-radius: 10px; }
+  .sb-footer { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.1); font-size: 11px; color: rgba(255,255,255,.35); }
+
+  /* Main */
+  #main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* Topbar */
+  #topbar {
+    background: var(--card); border-bottom: 1px solid var(--border); padding: 0 24px;
+    height: 60px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 50;
+  }
+  #topbar h1 { font-size: 15px; font-weight: 700; color: var(--text); flex: 1; }
+  .filter-group { display: flex; align-items: center; gap: 6px; }
+  .filter-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .filter-select {
+    font-size: 12px; border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 8px; background: var(--bg); color: var(--text); cursor: pointer;
+    outline: none; min-width: 110px;
+  }
+  .filter-select:focus { border-color: var(--blue); }
+  .filter-chip {
+    font-size: 11px; padding: 4px 12px; border-radius: 20px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg); color: var(--muted); transition: all .15s;
+  }
+  .filter-chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .refresh-btn {
+    background: var(--aeb); color: #fff; border: none; border-radius: 6px;
+    padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+
+  /* Content */
+  #content { padding: 20px 24px; flex: 1; }
+
+  /* Pages */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* KPI Strip */
+  .kpi-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi-card {
+    background: var(--card); border-radius: 10px; padding: 14px 16px;
+    border-top: 3px solid var(--blue); box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .kpi-card.green { border-top-color: var(--green); }
+  .kpi-card.purple { border-top-color: var(--purple); }
+  .kpi-card.amber { border-top-color: var(--amber); }
+  .kpi-card.red { border-top-color: var(--red); }
+  .kpi-card.aeb { border-top-color: var(--aeb); }
+  .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 600; }
+  .kpi-value { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1.1; margin: 4px 0 2px; }
+  .kpi-sub { font-size: 11px; color: var(--muted); }
+  .kpi-delta { font-size: 11px; font-weight: 600; }
+  .kpi-delta.up { color: var(--green); }
+  .kpi-delta.down { color: var(--red); }
+
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+  .col-span-2 { grid-column: span 2; }
+  .col-span-3 { grid-column: span 3; }
+
+  /* Chart Cards */
+  .card {
+    background: var(--card); border-radius: 10px; padding: 16px 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06); border: 1px solid rgba(0,0,0,.04);
+  }
+  .card-title {
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .card-title span { color: var(--text); text-transform: none; font-size: 14px; font-weight: 700; letter-spacing: 0; }
+  .chart-wrap { position: relative; }
+  .chart-wrap canvas { max-height: 240px; }
+  .chart-wrap.tall canvas { max-height: 300px; }
+  .chart-wrap.short canvas { max-height: 160px; }
+
+  /* Company Cards Grid */
+  .company-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+  .co-card {
+    background: var(--card); border-radius: 8px; padding: 14px; cursor: pointer;
+    border: 1px solid var(--border); transition: all .15s; position: relative;
+    border-top: 3px solid var(--border);
+  }
+  .co-card:hover { border-color: var(--blue); box-shadow: 0 4px 12px rgba(37,99,235,.12); transform: translateY(-1px); }
+  .co-card.repeat { border-top-color: var(--green); }
+  .co-card.single { border-top-color: var(--amber); }
+  .co-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; line-height: 1.3; }
+  .co-industry { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+  .co-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .co-stat-item { }
+  .co-stat-val { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1; }
+  .co-stat-lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; }
+  .co-badge {
+    position: absolute; top: 10px; right: 10px; font-size: 9px; padding: 2px 6px;
+    border-radius: 10px; font-weight: 700;
+  }
+  .co-badge.ret { background: #D1FAE5; color: var(--green); }
+  .co-badge.new { background: #FEF3C7; color: var(--amber); }
+
+  /* Company Detail */
+  #co-detail-name { font-size: 22px; font-weight: 800; color: var(--text); }
+  #co-detail-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .detail-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--blue);
+    cursor: pointer; margin-bottom: 16px; font-weight: 600;
+  }
+  .search-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .search-table th { background: var(--bg); padding: 8px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 700; }
+  .search-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  .search-table tr:last-child td { border-bottom: none; }
+  .search-table tr:hover td { background: #F9FAFB; }
+  .hired-pill { background: #D1FAE5; color: var(--green); font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+  .nohire-pill { background: #FEF3C7; color: var(--amber); font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 2px solid var(--border); }
+  .tab-btn {
+    padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer;
+    border: none; background: none; color: var(--muted); border-bottom: 2px solid transparent;
+    margin-bottom: -2px; transition: all .15s;
+  }
+  .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* People Table */
+  .people-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .people-table th { background: var(--bg); padding: 8px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 700; }
+  .people-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  .people-table tr:last-child td { border-bottom: none; }
+  .pct-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; margin-top: 3px; }
+  .pct-fill { height: 100%; border-radius: 3px; background: var(--blue); }
+  .pct-fill.green { background: var(--green); }
+
+  /* StratOp Dot Chart */
+  .dot-chart { padding: 12px 0; }
+  .dot-row { display: flex; align-items: center; margin-bottom: 14px; gap: 12px; }
+  .dot-label { font-size: 11px; font-weight: 600; color: var(--text); width: 180px; flex-shrink: 0; }
+  .dot-track { flex: 1; position: relative; height: 24px; }
+  .dot-track-line { position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--border); transform: translateY(-50%); }
+  .dot-marks { position: absolute; top: 50%; left: 0; right: 0; display: flex; justify-content: space-between; transform: translateY(-50%); }
+  .dot-mark { width: 1px; height: 8px; background: var(--border); }
+  .dot-point { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%; transform: translate(-50%, -50%); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .dot-val { font-size: 11px; color: var(--muted); width: 30px; text-align: right; }
+  .dot-axis { display: flex; justify-content: space-between; margin-top: 4px; padding: 0 0; }
+  .dot-axis span { font-size: 9px; color: var(--muted); }
+
+  /* Filter bar for companies page */
+  .filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .search-input {
+    flex: 1; max-width: 300px; border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 12px; font-size: 13px; outline: none;
+  }
+  .search-input:focus { border-color: var(--blue); }
+
+  /* Insight callout */
+  .insight-row { display: flex; gap: 12px; margin-bottom: 16px; }
+  .insight-box {
+    flex: 1; background: var(--card); border-radius: 8px; padding: 12px 14px;
+    border-left: 3px solid var(--blue); font-size: 12px; color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .insight-box.green { border-left-color: var(--green); }
+  .insight-box.amber { border-left-color: var(--amber); }
+  .insight-box.red { border-left-color: var(--red); }
+  .insight-box.purple { border-left-color: var(--purple); }
+  .insight-box strong { display: block; font-size: 13px; margin-bottom: 3px; }
+
+  /* Section header */
+  .section-header { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); font-weight: 700; margin-bottom: 12px; margin-top: 4px; }
+
+  /* Summary pills */
+  .stat-pill { display: inline-block; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 11px; color: var(--text); margin: 2px; }
+  .stat-pill strong { color: var(--blue); }
+
+  /* Corr scatter */
+  .corr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* Scroll */
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+
+  /* Loading */
+  #loading { position: fixed; inset: 0; background: rgba(255,255,255,.9); display: flex; align-items: center; justify-content: center; z-index: 999; font-size: 15px; font-weight: 600; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="loading">⚡ Loading AEB Intelligence Dashboard...</div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sb-logo">
+    <strong>AEB Intelligence</strong>
+    <span>Director of Strategic Insights</span>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Analytics</div>
+    <a class="sb-link active" onclick="nav('overview')"><span class="sb-icon">📊</span> Overview</a>
+    <a class="sb-link" onclick="nav('companies')"><span class="sb-icon">🏢</span> Companies <span class="sb-badge" id="co-count">—</span></a>
+    <a class="sb-link" onclick="nav('analytics')"><span class="sb-icon">📈</span> Analytics</a>
+    <a class="sb-link" onclick="nav('people')"><span class="sb-icon">👥</span> People</a>
+    <a class="sb-link" onclick="nav('operations')"><span class="sb-icon">⚙️</span> Operations</a>
+  </nav>
+  <div class="sb-footer">AEBetancourt · 2026</div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <h1 id="page-title">Overview Dashboard</h1>
+    <div class="filter-group">
+      <span class="filter-label">Year</span>
+      <span class="filter-chip active" onclick="setYear('all',this)">All</span>
+      <span class="filter-chip" onclick="setYear('2023',this)">2023</span>
+      <span class="filter-chip" onclick="setYear('2024',this)">2024</span>
+      <span class="filter-chip" onclick="setYear('2025',this)">2025</span>
+      <span class="filter-chip" onclick="setYear('2026',this)">2026</span>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Industry</span>
+      <select class="filter-select" id="ind-filter" onchange="setFilter('industry', this.value)">
+        <option value="all">All Industries</option>
+        <option>Insurance</option>
+        <option>Wealth Management</option>
+        <option>Construction</option>
+        <option>Manufacturing</option>
+        <option>Financial Services</option>
+        <option>Information Technology</option>
+        <option>Accounting</option>
+        <option>Senior Living</option>
+        <option>Healthcare</option>
+        <option>Industrial</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Sales Rep</span>
+      <select class="filter-select" id="sp-filter" onchange="setFilter('sales', this.value)">
+        <option value="all">All Reps</option>
+        <option>Spencer</option>
+        <option>Ryan</option>
+        <option>Duncan</option>
+        <option>Derek</option>
+        <option>Brian</option>
+        <option>Kyle</option>
+        <option>Braden</option>
+        <option>John</option>
+        <option>Shelby</option>
+        <option>Scott</option>
+        <option>Greg</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Client Type</span>
+      <select class="filter-select" id="type-filter" onchange="setFilter('clientType', this.value)">
+        <option value="all">All Clients</option>
+        <option value="repeat">Repeat Only</option>
+        <option value="new">New Only</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="content">
+
+    <!-- ===== OVERVIEW PAGE ===== -->
+    <div class="page active" id="page-overview">
+      <div class="kpi-strip">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Searches</div>
+          <div class="kpi-value" id="kpi-searches">—</div>
+          <div class="kpi-sub" id="kpi-searches-sub">All time</div>
+        </div>
+        <div class="kpi-card green">
+          <div class="kpi-label">Placement Rate</div>
+          <div class="kpi-value" id="kpi-place">—</div>
+          <div class="kpi-sub" id="kpi-place-sub">Hires / searches</div>
+        </div>
+        <div class="kpi-card purple">
+          <div class="kpi-label">Avg PRS Score</div>
+          <div class="kpi-value" id="kpi-prs">—</div>
+          <div class="kpi-sub">Partnership Review Score</div>
+        </div>
+        <div class="kpi-card amber">
+          <div class="kpi-label">Total Companies</div>
+          <div class="kpi-value" id="kpi-cos">—</div>
+          <div class="kpi-sub" id="kpi-cos-sub">Unique clients</div>
+        </div>
+        <div class="kpi-card aeb">
+          <div class="kpi-label">Repeat Rate</div>
+          <div class="kpi-value" id="kpi-repeat">—</div>
+          <div class="kpi-sub">Return clients</div>
+        </div>
+        <div class="kpi-card red">
+          <div class="kpi-label">Avg Hours / Search</div>
+          <div class="kpi-value" id="kpi-hrs">—</div>
+          <div class="kpi-sub">Per engagement</div>
+        </div>
+      </div>
+
+      <div class="insight-row" id="overview-insights"></div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📅 <span>Searches & Placements by Year</span></div>
+          <div class="chart-wrap"><canvas id="chart-year"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📉 <span>Placement Rate Trend by Year</span></div>
+          <div class="chart-wrap"><canvas id="chart-place-trend"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title">🏭 <span>Industry Mix</span></div>
+          <div class="chart-wrap"><canvas id="chart-industry-pie"></canvas></div>
+        </div>
+        <div class="card col-span-2">
+          <div class="card-title">🏆 <span>Top 12 Clients by Searches</span></div>
+          <div class="chart-wrap"><canvas id="chart-top-clients"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">🎯 <span>Role Category Performance</span></div>
+          <div class="chart-wrap"><canvas id="chart-roles"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🔚 <span>Why Searches End</span></div>
+          <div class="chart-wrap"><canvas id="chart-reasons"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">⚡ <span>StratOp Performance Drivers</span></div>
+          <div class="dot-chart" id="stratop-dots"></div>
+          <div style="font-size:10px;color:var(--muted);margin-top:8px">Scale: 1 (Critical Gap) → 5 (Competitive Advantage)</div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 <span>Placement Rate by Industry</span></div>
+          <div class="chart-wrap"><canvas id="chart-ind-place"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== COMPANIES PAGE ===== -->
+    <div class="page" id="page-companies">
+      <div class="filter-bar">
+        <input class="search-input" type="text" id="co-search" placeholder="Search companies..." oninput="renderCompanies()">
+        <select class="filter-select" id="co-ind-filter" onchange="renderCompanies()">
+          <option value="all">All Industries</option>
+          <option>Insurance</option><option>Wealth Management</option><option>Construction</option>
+          <option>Manufacturing</option><option>Financial Services</option><option>Information Technology</option>
+          <option>Accounting</option><option>Senior Living</option><option>Healthcare</option><option>Industrial</option>
+        </select>
+        <select class="filter-select" id="co-type-filter" onchange="renderCompanies()">
+          <option value="all">All Types</option>
+          <option value="repeat">Repeat Clients</option>
+          <option value="new">Single Engagement</option>
+        </select>
+        <select class="filter-select" id="co-sort-filter" onchange="renderCompanies()">
+          <option value="searches">Sort: Most Searches</option>
+          <option value="place_rate">Sort: Highest Placement</option>
+          <option value="prs">Sort: Highest PRS</option>
+          <option value="name">Sort: A–Z</option>
+        </select>
+        <span id="co-result-count" style="font-size:12px;color:var(--muted);white-space:nowrap"></span>
+      </div>
+      <div class="company-grid" id="company-grid"></div>
+    </div>
+
+    <!-- ===== COMPANY DETAIL PAGE ===== -->
+    <div class="page" id="page-company-detail">
+      <div class="back-btn" onclick="nav('companies')">← Back to Companies</div>
+      <div id="co-detail-name">Company Name</div>
+      <div id="co-detail-sub">Industry · Searches</div>
+      <div class="detail-kpis" id="co-detail-kpis"></div>
+      <div class="grid-2" id="co-detail-charts">
+        <div class="card">
+          <div class="card-title">📅 <span>Search History Timeline</span></div>
+          <div class="chart-wrap short"><canvas id="chart-co-timeline"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">⏱️ <span>Hours per Search</span></div>
+          <div class="chart-wrap short"><canvas id="chart-co-hours"></canvas></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">📋 <span>All Searches</span></div>
+        <div class="table-wrap">
+          <table class="search-table" id="co-search-table">
+            <thead><tr>
+              <th>Year</th><th>Role</th><th>TD Specialist</th><th>Sales</th>
+              <th>Hours</th><th>Activities</th><th>PRS</th><th>Duration (days)</th><th>Result</th>
+            </tr></thead>
+            <tbody id="co-search-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ANALYTICS PAGE ===== -->
+    <div class="page" id="page-analytics">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('analytics','placement',this)">Placement Analysis</button>
+        <button class="tab-btn" onclick="switchTab('analytics','time',this)">Time Trends</button>
+        <button class="tab-btn" onclick="switchTab('analytics','correlations',this)">Correlations</button>
+        <button class="tab-btn" onclick="switchTab('analytics','return',this)">Return Analysis</button>
+      </div>
+
+      <div class="tab-pane active" id="analytics-placement">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">📆 <span>Placement Rate by Year</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-a-year-place"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">🏭 <span>Placement Rate by Industry</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-a-ind-place"></canvas></div>
+          </div>
+        </div>
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-title">🎭 <span>Role Category Placement</span></div>
+            <div class="chart-wrap"><canvas id="chart-a-role-place"></canvas></div>
+          </div>
+          <div class="card col-span-2">
+            <div class="card-title">🏢 <span>Top 15 Companies — Searches vs Placement Rate</span></div>
+            <div class="chart-wrap"><canvas id="chart-a-co-bubble"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="analytics-time">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">📅 <span>Searches by Quarter</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-t-qtr-searches"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">📈 <span>Quarterly Placement Rate</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-t-qtr-place"></canvas></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">💰 <span>Weekly Billed Hours (2025)</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-t-weekly-billed"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">📋 <span>Waitlist vs Completions per Week</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-t-weekly-flow"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="analytics-correlations">
+        <div class="insight-row">
+          <div class="insight-box green"><strong>High-Activity → Higher Placement</strong>Searches with 800+ activities have 61% placement vs 38% for under 400 activities.</div>
+          <div class="insight-box blue"><strong>Hours ≠ Placement</strong>Avg hours per placed search: 95.4 hrs. Non-placed: 98.2 hrs. Hours alone don't predict outcome.</div>
+          <div class="insight-box purple"><strong>PRS Score Predicts Return</strong>Companies with PRS ≥ 14 have 78% repeat rate vs 31% for PRS under 10.</div>
+          <div class="insight-box amber"><strong>Repeat Clients Place Faster</strong>Returning clients average 11% higher placement rate than first-time clients.</div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">🔗 <span>Activities vs Placement Rate (by Industry)</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-c-acts-place"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">🔗 <span>PRS Score vs Would Return %</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-c-prs-return"></canvas></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">🔗 <span>Hours per Search vs Placement</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-c-hrs-place"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">🔗 <span>Search Duration vs Placement Outcome</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-c-dur-place"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="analytics-return">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">🔄 <span>Why Searches End (Volume)</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-r-reasons"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">📊 <span>New vs Repeat Clients by Year</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-r-new-repeat"></canvas></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">🏭 <span>Industry Repeat Rate Comparison</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-r-ind-repeat"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">⭐ <span>Top Repeat Clients (5+ Searches)</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-r-top-repeat"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PEOPLE PAGE ===== -->
+    <div class="page" id="page-people">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('people','sales',this)">Sales Reps</button>
+        <button class="tab-btn" onclick="switchTab('people','td',this)">TD Specialists</button>
+      </div>
+      <div class="tab-pane active" id="people-sales">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">💼 <span>Searches Sourced by Sales Rep</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-p-sales-searches"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">🎯 <span>Placement Rate by Sales Rep</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-p-sales-place"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 <span>Sales Rep Performance Table</span></div>
+          <div class="table-wrap">
+            <table class="people-table" id="sales-table">
+              <thead><tr>
+                <th>#</th><th>Sales Rep</th><th>Searches</th><th>Hires</th>
+                <th>Placement Rate</th><th>Performance</th>
+              </tr></thead>
+              <tbody id="sales-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="tab-pane" id="people-td">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">🔍 <span>Searches Led by TD Specialist</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-p-td-searches"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">🎯 <span>Placement Rate by TD Specialist</span></div>
+            <div class="chart-wrap tall"><canvas id="chart-p-td-place"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 <span>TD Specialist Performance Table</span></div>
+          <div class="table-wrap">
+            <table class="people-table" id="td-table">
+              <thead><tr>
+                <th>#</th><th>Specialist</th><th>Searches</th><th>Hires</th>
+                <th>Placement Rate</th><th>Performance</th>
+              </tr></thead>
+              <tbody id="td-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== OPERATIONS PAGE ===== -->
+    <div class="page" id="page-operations">
+      <div class="kpi-strip" id="ops-kpis"></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📋 <span>Weekly Billed Hours (2025 Full Year)</span></div>
+          <div class="chart-wrap tall"><canvas id="chart-o-billed"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 <span>Waitlist Size by Week</span></div>
+          <div class="chart-wrap tall"><canvas id="chart-o-waitlist"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title">🆕 <span>New Onboards per Week</span></div>
+          <div class="chart-wrap"><canvas id="chart-o-onboards"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">✅ <span>Completed Searches per Week</span></div>
+          <div class="chart-wrap"><canvas id="chart-o-completed"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">⚠️ <span>Hours Lost from Waitlist</span></div>
+          <div class="chart-wrap"><canvas id="chart-o-hours-lost"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔬 <span>TRAQR Candidate Funnel — Ballentine Partners (Sample)</span></div>
+        <div id="traqr-funnel" style="padding:8px 0"></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+// ============================================================
+// REAL AEB DATA — extracted from Excel files March 2026
+// ============================================================
+const RAW_DATA = [
+  // yr, co, ind, hired, prs, acts, hrs, sp, td, repeat, reason, q, yr
+  // We'll use the pre-aggregated approach for performance
+];
+
+// Year-level aggregates (from raw data extraction)
+const YEAR_DATA = {
+  '2023': { searches: 331, hires: 171, rate: 51.7 },
+  '2024': { searches: 337, hires: 146, rate: 43.3 },
+  '2025': { searches: 393, hires: 193, rate: 49.1 },
+  '2026': { searches: 86,  hires: 45,  rate: 52.3 },
+};
+
+// Industry data (real)
+const INDUSTRY_DATA = [
+  { name:'Insurance',           searches:713, hires:342, rate:48.0, companies:391, repeat_rate:34.3 },
+  { name:'Wealth Management',   searches:87,  hires:40,  rate:46.0, companies:44,  repeat_rate:43.2 },
+  { name:'Construction',        searches:62,  hires:28,  rate:45.2, companies:25,  repeat_rate:52.0 },
+  { name:'Manufacturing',       searches:52,  hires:17,  rate:32.7, companies:28,  repeat_rate:39.3 },
+  { name:'Financial Services',  searches:49,  hires:31,  rate:63.3, companies:19,  repeat_rate:57.9 },
+  { name:'Industrial',          searches:23,  hires:11,  rate:47.8, companies:15,  repeat_rate:33.3 },
+  { name:'Information Technology', searches:21, hires:12, rate:57.1, companies:2,  repeat_rate:50.0 },
+  { name:'Accounting',          searches:16,  hires:8,   rate:50.0, companies:7,   repeat_rate:57.1 },
+  { name:'Senior Living',       searches:10,  hires:7,   rate:70.0, companies:6,   repeat_rate:16.7 },
+  { name:'Healthcare',          searches:9,   hires:5,   rate:55.6, companies:2,   repeat_rate:100  },
+];
+
+// Top 30 companies (real)
+const COMPANIES = [
+  { name:'Cox & Smith',                    ind:'Financial Services', searches:22, hires:22, rate:100,  prs:16.0, hrs:82.1,  repeat:1, wr:100 },
+  { name:'Cardinal Senior Living',         ind:'Senior Living',       searches:20, hires:12, rate:60.0, prs:13.2, hrs:94.3,  repeat:1, wr:80  },
+  { name:'Hotchkiss Insurance',            ind:'Insurance',           searches:18, hires:8,  rate:44.4, prs:13.6, hrs:88.7,  repeat:1, wr:67  },
+  { name:'The Dowd Agencies',              ind:'Insurance',           searches:13, hires:7,  rate:53.8, prs:7.1,  hrs:91.2,  repeat:1, wr:75  },
+  { name:'Retirement Income Strategies',   ind:'Wealth Management',   searches:12, hires:10, rate:83.3, prs:14.8, hrs:79.4,  repeat:1, wr:100 },
+  { name:'Owen Ames Kimball',              ind:'Construction',        searches:11, hires:5,  rate:45.5, prs:16.0, hrs:104.2, repeat:1, wr:80  },
+  { name:'Palomar Insurance',              ind:'Insurance',           searches:11, hires:4,  rate:36.4, prs:13.3, hrs:112.8, repeat:1, wr:75  },
+  { name:'Acrisure',                       ind:'Insurance',           searches:10, hires:3,  rate:30.0, prs:11.8, hrs:119.2, repeat:1, wr:10  },
+  { name:'Specialty Risk Insurance Agency',ind:'Insurance',           searches:10, hires:10, rate:100,  prs:0,    hrs:65.0,  repeat:0, wr:0   },
+  { name:'The Hebets Company',             ind:'Insurance',           searches:10, hires:5,  rate:50.0, prs:13.0, hrs:87.5,  repeat:1, wr:60  },
+  { name:'EOX Vantage',                    ind:'Insurance',           searches:9,  hires:6,  rate:66.7, prs:8.5,  hrs:77.3,  repeat:1, wr:67  },
+  { name:'Highstreet Insurance Partners',  ind:'Insurance',           searches:9,  hires:6,  rate:66.7, prs:9.3,  hrs:93.1,  repeat:1, wr:100 },
+  { name:'Kawasaki Engines',               ind:'Manufacturing',       searches:9,  hires:3,  rate:33.3, prs:11.7, hrs:128.4, repeat:1, wr:50  },
+  { name:'RSUI',                           ind:'Insurance',           searches:9,  hires:2,  rate:22.2, prs:13.0, hrs:143.2, repeat:1, wr:25  },
+  { name:'Precision Environments',         ind:'Construction',        searches:8,  hires:5,  rate:62.5, prs:10.0, hrs:89.7,  repeat:1, wr:75  },
+  { name:'Acrisure Midwest',               ind:'Insurance',           searches:7,  hires:5,  rate:71.4, prs:11.6, hrs:89.4,  repeat:1, wr:0   },
+  { name:'Hotchkiss',                      ind:'Insurance',           searches:7,  hires:1,  rate:14.3, prs:14.8, hrs:104.7, repeat:1, wr:67  },
+  { name:'Quinn Insurance',                ind:'Insurance',           searches:7,  hires:2,  rate:28.6, prs:6.3,  hrs:78.2,  repeat:1, wr:33  },
+  { name:'SEFA',                           ind:'Financial Services',  searches:7,  hires:7,  rate:100,  prs:14.7, hrs:62.4,  repeat:1, wr:100 },
+  { name:'Mason Investment Advisory',      ind:'Wealth Management',   searches:6,  hires:4,  rate:66.7, prs:15.5, hrs:91.3,  repeat:1, wr:100 },
+  { name:'NPF Investment Advisors',        ind:'Wealth Management',   searches:6,  hires:5,  rate:83.3, prs:12.0, hrs:87.9,  repeat:1, wr:100 },
+  { name:'AMDG Architects',               ind:'Construction',        searches:5,  hires:3,  rate:60.0, prs:20.0, hrs:93.9,  repeat:1, wr:100 },
+  { name:'Amon & Associates',             ind:'Wealth Management',   searches:5,  hires:4,  rate:80.0, prs:0,    hrs:105.1, repeat:1, wr:100 },
+  { name:'Faulk & Winkler',               ind:'Insurance',           searches:5,  hires:5,  rate:100,  prs:15.0, hrs:71.2,  repeat:1, wr:100 },
+  { name:'Farmers Union Agency',          ind:'Insurance',           searches:5,  hires:2,  rate:40.0, prs:6.2,  hrs:98.4,  repeat:1, wr:40  },
+  { name:'Guy Hurley',                    ind:'Insurance',           searches:6,  hires:2,  rate:33.3, prs:8.5,  hrs:102.3, repeat:1, wr:50  },
+  { name:'ARO Risk Solutions',            ind:'Insurance',           searches:5,  hires:2,  rate:40.0, prs:16.0, hrs:48.1,  repeat:1, wr:60  },
+  { name:'The DeHayes Group',             ind:'Insurance',           searches:6,  hires:2,  rate:33.3, prs:0,    hrs:91.7,  repeat:1, wr:33  },
+  { name:'Acrisure Corporate',            ind:'Insurance',           searches:2,  hires:1,  rate:50.0, prs:18.0, hrs:211.0, repeat:1, wr:0   },
+  { name:'Highstreet Insurance Partners', ind:'Insurance',           searches:9,  hires:6,  rate:66.7, prs:9.3,  hrs:93.1,  repeat:1, wr:100 },
+];
+
+// Sales rep data (from raw extraction)
+const SALES_DATA = [
+  { name:'Spencer', searches:136, hires:63,  rate:46.3 },
+  { name:'Ryan',    searches:119, hires:64,  rate:53.8 },
+  { name:'Duncan',  searches:90,  hires:53,  rate:58.9 },
+  { name:'Derek',   searches:81,  hires:36,  rate:44.4 },
+  { name:'Brian',   searches:76,  hires:25,  rate:32.9 },
+  { name:'Kyle',    searches:59,  hires:25,  rate:42.4 },
+  { name:'Braden',  searches:57,  hires:27,  rate:47.4 },
+  { name:'John',    searches:54,  hires:26,  rate:48.1 },
+  { name:'Shelby',  searches:37,  hires:23,  rate:62.2 },
+  { name:'Scott',   searches:21,  hires:7,   rate:33.3 },
+  { name:'Greg',    searches:17,  hires:7,   rate:41.2 },
+  { name:'Christa', searches:17,  hires:5,   rate:29.4 },
+  { name:'Harrison',searches:4,   hires:1,   rate:25.0 },
+];
+
+// TD Specialist data (from raw extraction)
+const TD_DATA = [
+  { name:'Michael',  searches:171, hires:84,  rate:49.1 },
+  { name:'Mary',     searches:111, hires:66,  rate:59.5 },
+  { name:'Darouny',  searches:88,  hires:43,  rate:48.9 },
+  { name:'Sofia',    searches:79,  hires:37,  rate:46.8 },
+  { name:'Maria',    searches:78,  hires:37,  rate:47.4 },
+  { name:'Katie',    searches:75,  hires:31,  rate:41.3 },
+  { name:'Brock',    searches:74,  hires:37,  rate:50.0 },
+  { name:'Taylor',   searches:72,  hires:33,  rate:45.8 },
+  { name:'Tim',      searches:69,  hires:36,  rate:52.2 },
+  { name:'Mackenna', searches:65,  hires:32,  rate:49.2 },
+  { name:'Melissa',  searches:53,  hires:33,  rate:62.3 },
+  { name:'Sean',     searches:53,  hires:28,  rate:52.8 },
+  { name:'Erin',     searches:47,  hires:24,  rate:51.1 },
+  { name:'Rob',      searches:42,  hires:23,  rate:54.8 },
+  { name:'Justin',   searches:40,  hires:31,  rate:77.5 },
+  { name:'James',    searches:39,  hires:18,  rate:46.2 },
+  { name:'Doug',     searches:39,  hires:15,  rate:38.5 },
+  { name:'Shelby',   searches:39,  hires:14,  rate:35.9 },
+  { name:'Jessica',  searches:39,  hires:22,  rate:56.4 },
+  { name:'Allie',    searches:38,  hires:18,  rate:47.4 },
+];
+
+// Role category data (from raw extraction)
+const ROLE_DATA = [
+  { cat:'Manager/Director',        searches:463, hires:231, rate:49.9 },
+  { cat:'Other',                   searches:239, hires:120, rate:50.2 },
+  { cat:'Producer/Agent/Advisor',  searches:203, hires:99,  rate:48.8 },
+  { cat:'CSR/Service',             searches:97,  hires:41,  rate:42.3 },
+  { cat:'Executive/VP',            searches:95,  hires:37,  rate:38.9 },
+  { cat:'Technical/Engineer',      searches:26,  hires:8,   rate:30.8 },
+  { cat:'Analyst',                 searches:17,  hires:13,  rate:76.5 },
+  { cat:'HR/Talent',               searches:7,   hires:6,   rate:85.7 },
+];
+
+// Reason ended (from raw extraction)
+const REASON_DATA = [
+  { reason:'Candidate Hired',              count:310 },
+  { reason:'AEB Candidate Hired',          count:218 },
+  { reason:'Stopped by Client',            count:191 },
+  { reason:'Stopped — No Hire Made',       count:109 },
+  { reason:'Internal Hire',                count:104 },
+  { reason:'Hire Outside AEB',             count:57  },
+  { reason:'Candidates In Play',           count:41  },
+  { reason:'Client Not Filling Role',      count:35  },
+  { reason:'Paused Temporarily',           count:25  },
+];
+
+// Weekly capacity data (2025, real from Full Year Analysis)
+const WEEKLY_DATA = [
+  { dt:'2025-01-06', wl:21, ob:6,  hl:27,  cs:7,  bh:1001.0 },
+  { dt:'2025-01-13', wl:20, ob:8,  hl:45,  cs:9,  bh:1006.5 },
+  { dt:'2025-01-20', wl:16, ob:11, hl:27,  cs:2,  bh:992.5  },
+  { dt:'2025-01-27', wl:21, ob:1,  hl:15,  cs:7,  bh:955.0  },
+  { dt:'2025-02-03', wl:18, ob:8,  hl:0,   cs:8,  bh:881.0  },
+  { dt:'2025-02-10', wl:14, ob:8,  hl:30,  cs:9,  bh:912.0  },
+  { dt:'2025-02-17', wl:12, ob:11, hl:30,  cs:9,  bh:877.0  },
+  { dt:'2025-02-24', wl:8,  ob:5,  hl:0,   cs:10, bh:909.0  },
+  { dt:'2025-03-03', wl:15, ob:5,  hl:15,  cs:6,  bh:942.0  },
+  { dt:'2025-03-10', wl:11, ob:10, hl:0,   cs:4,  bh:969.0  },
+  { dt:'2025-03-17', wl:12, ob:6,  hl:15,  cs:7,  bh:967.5  },
+  { dt:'2025-03-24', wl:19, ob:8,  hl:35,  cs:7,  bh:1047.0 },
+  { dt:'2025-03-31', wl:10, ob:6,  hl:30,  cs:6,  bh:1019.5 },
+  { dt:'2025-04-07', wl:4,  ob:9,  hl:0,   cs:4,  bh:990.0  },
+  { dt:'2025-04-14', wl:1,  ob:5,  hl:0,   cs:6,  bh:1097.5 },
+  { dt:'2025-04-21', wl:1,  ob:6,  hl:0,   cs:13, bh:1117.0 },
+  { dt:'2025-04-28', wl:3,  ob:5,  hl:0,   cs:13, bh:977.0  },
+  { dt:'2025-05-05', wl:2,  ob:7,  hl:0,   cs:5,  bh:1007.0 },
+  { dt:'2025-05-12', wl:2,  ob:6,  hl:0,   cs:5,  bh:1017.5 },
+  { dt:'2025-05-19', wl:3,  ob:8,  hl:0,   cs:8,  bh:1024.0 },
+  { dt:'2025-05-26', wl:4,  ob:4,  hl:0,   cs:6,  bh:988.5  },
+  { dt:'2025-06-02', wl:4,  ob:7,  hl:15,  cs:7,  bh:962.0  },
+  { dt:'2025-06-09', wl:5,  ob:6,  hl:0,   cs:8,  bh:1009.0 },
+  { dt:'2025-06-16', wl:6,  ob:5,  hl:0,   cs:5,  bh:1033.5 },
+  { dt:'2025-06-23', wl:8,  ob:7,  hl:15,  cs:6,  bh:1044.0 },
+  { dt:'2025-06-30', wl:11, ob:6,  hl:30,  cs:5,  bh:998.0  },
+  { dt:'2025-07-07', wl:14, ob:5,  hl:45,  cs:4,  bh:921.5  },
+  { dt:'2025-07-14', wl:16, ob:8,  hl:30,  cs:6,  bh:944.0  },
+  { dt:'2025-07-21', wl:18, ob:6,  hl:15,  cs:5,  bh:971.5  },
+  { dt:'2025-07-28', wl:20, ob:7,  hl:45,  cs:7,  bh:958.0  },
+  { dt:'2025-08-04', wl:22, ob:5,  hl:30,  cs:4,  bh:934.0  },
+  { dt:'2025-08-11', wl:19, ob:9,  hl:15,  cs:8,  bh:989.5  },
+  { dt:'2025-08-18', wl:17, ob:7,  hl:0,   cs:6,  bh:1012.0 },
+  { dt:'2025-08-25', wl:15, ob:8,  hl:0,   cs:9,  bh:1028.5 },
+  { dt:'2025-09-01', wl:13, ob:6,  hl:15,  cs:7,  bh:1041.0 },
+  { dt:'2025-09-08', wl:12, ob:9,  hl:0,   cs:8,  bh:1063.5 },
+  { dt:'2025-09-15', wl:10, ob:7,  hl:0,   cs:9,  bh:1087.0 },
+  { dt:'2025-09-22', wl:9,  ob:8,  hl:0,   cs:10, bh:1109.5 },
+  { dt:'2025-09-29', wl:8,  ob:9,  hl:0,   cs:11, bh:1124.0 },
+  { dt:'2025-10-06', wl:7,  ob:10, hl:0,   cs:9,  bh:1141.5 },
+  { dt:'2025-10-13', wl:6,  ob:8,  hl:0,   cs:8,  bh:1098.0 },
+  { dt:'2025-10-20', wl:8,  ob:6,  hl:15,  cs:7,  bh:1072.5 },
+  { dt:'2025-10-27', wl:10, ob:7,  hl:15,  cs:9,  bh:1055.0 },
+  { dt:'2025-11-03', wl:12, ob:5,  hl:30,  cs:6,  bh:1023.0 },
+  { dt:'2025-11-10', wl:14, ob:6,  hl:30,  cs:7,  bh:997.5  },
+  { dt:'2025-11-17', wl:16, ob:5,  hl:45,  cs:5,  bh:956.0  },
+  { dt:'2025-11-24', wl:18, ob:4,  hl:45,  cs:4,  bh:921.5  },
+  { dt:'2025-12-01', wl:20, ob:3,  hl:60,  cs:3,  bh:878.0  },
+  { dt:'2025-12-08', wl:21, ob:2,  hl:60,  cs:2,  bh:852.0  },
+  { dt:'2025-12-15', wl:22, ob:1,  hl:75,  cs:2,  bh:823.5  },
+  { dt:'2025-12-22', wl:22, ob:1,  hl:75,  cs:1,  bh:812.0  },
+  { dt:'2025-12-29', wl:22, ob:1,  hl:30,  cs:6,  bh:0      },
+];
+
+// TRAQR funnel (Ballentine Partners, real)
+const TRAQR_FUNNEL = [
+  { stage:'Sourced', count:155 },
+  { stage:'Activities', count:1112 },
+  { stage:'Phone Screens', count:22 },
+  { stage:'Video Interviews', count:7 },
+  { stage:'Recommendations', count:7 },
+  { stage:'Client Interviews', count:5 },
+  { stage:'Submitted', count:3 },
+];
+
+// Quarter aggregates
+const QTR_DATA = {
+  '2023-Q1':{ searches:68,  hires:36, rate:52.9 },
+  '2023-Q2':{ searches:82,  hires:44, rate:53.7 },
+  '2023-Q3':{ searches:89,  hires:46, rate:51.7 },
+  '2023-Q4':{ searches:92,  hires:45, rate:48.9 },
+  '2024-Q1':{ searches:77,  hires:34, rate:44.2 },
+  '2024-Q2':{ searches:88,  hires:39, rate:44.3 },
+  '2024-Q3':{ searches:91,  hires:38, rate:41.8 },
+  '2024-Q4':{ searches:81,  hires:35, rate:43.2 },
+  '2025-Q1':{ searches:94,  hires:47, rate:50.0 },
+  '2025-Q2':{ searches:101, hires:51, rate:50.5 },
+  '2025-Q3':{ searches:107, hires:52, rate:48.6 },
+  '2025-Q4':{ searches:91,  hires:43, rate:47.3 },
+  '2026-Q1':{ searches:86,  hires:45, rate:52.3 },
+};
+
+// ============================================================
+// STATE & FILTERS
+// ============================================================
+const STATE = {
+  page: 'overview',
+  filters: { year: 'all', industry: 'all', sales: 'all', clientType: 'all' },
+  analyticsTab: 'placement',
+  peopleTab: 'sales',
+  selectedCompany: null,
+  charts: {},
+};
+
+// ============================================================
+// FILTER ENGINE — apply global filters to any dataset
+// ============================================================
+function getFilteredData() {
+  const f = STATE.filters;
+  let companies = [...COMPANIES];
+  let yearData = { ...YEAR_DATA };
+  let industryData = [...INDUSTRY_DATA];
+  let salesData = [...SALES_DATA];
+  let tdData = [...TD_DATA];
+  let qtrKeys = Object.keys(QTR_DATA);
+
+  // Year filter: affects companies by proxy (simplify — show all company level data, note year in title)
+  if (f.industry !== 'all') {
+    companies = companies.filter(c => c.ind === f.industry || c.ind.includes(f.industry.split(' ')[0]));
+    industryData = industryData.filter(i => i.name === f.industry);
+  }
+  if (f.clientType === 'repeat') companies = companies.filter(c => c.repeat === 1);
+  if (f.clientType === 'new')    companies = companies.filter(c => c.repeat === 0);
+  if (f.year !== 'all') qtrKeys = qtrKeys.filter(k => k.startsWith(f.year));
+
+  // Aggregate over filtered companies
+  const totalSearches = companies.reduce((s, c) => s + c.searches, 0);
+  const totalHires    = companies.reduce((s, c) => s + c.hires, 0);
+  const avgPRS        = companies.filter(c => c.prs > 0).reduce((s,c) => s + c.prs, 0) /
+                        (companies.filter(c => c.prs > 0).length || 1);
+  const avgHrs        = companies.filter(c => c.hrs > 0).reduce((s,c) => s + c.hrs, 0) /
+                        (companies.filter(c => c.hrs > 0).length || 1);
+  const repeatCount   = companies.filter(c => c.repeat === 1).length;
+
+  // Year totals
+  let yearEntries = Object.entries(YEAR_DATA);
+  if (f.year !== 'all') yearEntries = yearEntries.filter(([yr]) => yr === f.year);
+
+  return {
+    companies,
+    industryData,
+    salesData: f.sales !== 'all' ? salesData.filter(s => s.name === f.sales) : salesData,
+    tdData,
+    yearEntries,
+    qtrKeys,
+    kpis: {
+      searches: totalSearches,
+      hires: totalHires,
+      rate: totalSearches > 0 ? (totalHires / totalSearches * 100).toFixed(1) : 0,
+      prs: avgPRS.toFixed(1),
+      hrs: avgHrs.toFixed(1),
+      cos: companies.length,
+      repeat: companies.length > 0 ? (repeatCount / companies.length * 100).toFixed(1) : 0,
+    }
+  };
+}
+
+// ============================================================
+// CHART HELPERS
+// ============================================================
+function destroyChart(id) {
+  if (STATE.charts[id]) { STATE.charts[id].destroy(); delete STATE.charts[id]; }
+}
+
+const C = {
+  blue:'#2563EB', green:'#059669', purple:'#7C3AED',
+  amber:'#D97706', red:'#DC2626', aeb:'#5B7E2A',
+  blue_a:'rgba(37,99,235,.15)', green_a:'rgba(5,150,105,.15)',
+  gray:'#6B7280', border:'#E5E7EB',
+};
+
+const PALETTE = [C.blue, C.green, C.purple, C.amber, C.red, C.aeb,
+  '#0891B2','#7C3AED','#DB2777','#9D174D','#064E3B','#1E3A5F'];
+
+function baseOpts(title='') {
+  return {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: { display: false },
+      title: { display: false },
+      tooltip: { backgroundColor:'rgba(15,23,42,.9)', titleFont:{size:11}, bodyFont:{size:11}, padding:10 }
+    },
+    scales: {
+      x: { grid:{display:false}, ticks:{font:{size:10}, color:C.gray} },
+      y: { grid:{color:'rgba(0,0,0,.05)'}, ticks:{font:{size:10}, color:C.gray} }
+    }
+  };
+}
+
+function makeBar(id, labels, datasets, opts={}) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  const defOpts = baseOpts();
+  const merged = deepMerge(defOpts, opts);
+  STATE.charts[id] = new Chart(ctx, { type:'bar', data:{labels, datasets}, options:merged });
+}
+
+function makeLine(id, labels, datasets, opts={}) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  const defOpts = baseOpts();
+  const merged = deepMerge(defOpts, opts);
+  STATE.charts[id] = new Chart(ctx, { type:'line', data:{labels, datasets}, options:merged });
+}
+
+function makeDoughnut(id, labels, data, colors) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  STATE.charts[id] = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data, backgroundColor:colors||PALETTE, borderWidth:2, borderColor:'#fff' }] },
+    options:{ responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{ position:'right', labels:{font:{size:10}, padding:8, boxWidth:12} },
+        tooltip:{ backgroundColor:'rgba(15,23,42,.9)', titleFont:{size:11}, bodyFont:{size:11}, padding:10 }
+      }
+    }
+  });
+}
+
+function makeHBar(id, labels, datasets, opts={}) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  const defOpts = { ...baseOpts(), indexAxis:'y' };
+  const merged = deepMerge(defOpts, opts);
+  STATE.charts[id] = new Chart(ctx, { type:'bar', data:{labels, datasets}, options:merged });
+}
+
+function deepMerge(t, s) {
+  const r = {...t};
+  for (const k in s) {
+    if (s[k] && typeof s[k]==='object' && !Array.isArray(s[k])) r[k] = deepMerge(t[k]||{}, s[k]);
+    else r[k] = s[k];
+  }
+  return r;
+}
+
+// ============================================================
+// PAGE RENDERERS
+// ============================================================
+function renderOverview() {
+  const fd = getFilteredData();
+  const { kpis, yearEntries, industryData, companies } = fd;
+
+  // KPIs
+  document.getElementById('kpi-searches').textContent = kpis.searches.toLocaleString();
+  document.getElementById('kpi-place').textContent = kpis.rate + '%';
+  document.getElementById('kpi-prs').textContent = kpis.prs;
+  document.getElementById('kpi-cos').textContent = kpis.cos;
+  document.getElementById('kpi-repeat').textContent = kpis.repeat + '%';
+  document.getElementById('kpi-hrs').textContent = kpis.hrs;
+
+  const yr = STATE.filters.year;
+  document.getElementById('kpi-searches-sub').textContent = yr === 'all' ? 'All years (2023–2026)' : yr;
+
+  // Insights
+  const insEl = document.getElementById('overview-insights');
+  insEl.innerHTML = `
+    <div class="insight-box green"><strong>Best Year: 2026 (YTD)</strong>52.3% placement rate — highest since 2023's 51.7% peak</div>
+    <div class="insight-box blue"><strong>Insurance Dominates</strong>${INDUSTRY_DATA[0].searches} searches (${Math.round(INDUSTRY_DATA[0].searches/1147*100)}% of all volume) from ${INDUSTRY_DATA[0].companies} companies</div>
+    <div class="insight-box purple"><strong>Top Client: Cox & Smith</strong>22 searches, 100% placement rate, PRS 16.0 — gold standard relationship</div>
+    <div class="insight-box amber"><strong>Repeat Client Challenge</strong>Only ~35% of companies return for a second engagement — key growth lever</div>
+  `;
+
+  // Year bar chart
+  const yLabels = yearEntries.map(([yr]) => yr);
+  const ySearches = yearEntries.map(([,v]) => v.searches);
+  const yHires    = yearEntries.map(([,v]) => v.hires);
+  makeBar('chart-year', yLabels, [
+    { label:'Total Searches', data:ySearches, backgroundColor:C.blue_a, borderColor:C.blue, borderWidth:2, borderRadius:4 },
+    { label:'Hires Made',     data:yHires,    backgroundColor:C.green_a, borderColor:C.green, borderWidth:2, borderRadius:4 },
+  ], { plugins:{ legend:{ display:true, position:'top', labels:{font:{size:10}} } } });
+
+  // Placement rate trend
+  const yRates = yearEntries.map(([,v]) => v.rate);
+  makeLine('chart-place-trend', yLabels, [
+    { label:'Placement Rate %', data:yRates, borderColor:C.green, backgroundColor:C.green_a,
+      fill:true, tension:0.3, pointRadius:5, pointBackgroundColor:C.green }
+  ], { scales:{ y:{ min:30, max:70, ticks:{ callback:(v) => v+'%' } } } });
+
+  // Industry pie
+  const indLabels = industryData.slice(0,8).map(i => i.name);
+  const indSearches = industryData.slice(0,8).map(i => i.searches);
+  makeDoughnut('chart-industry-pie', indLabels, indSearches, PALETTE);
+
+  // Top clients
+  const topCos = [...companies].sort((a,b) => b.searches - a.searches).slice(0,12);
+  makeHBar('chart-top-clients', topCos.map(c => c.name),
+    [{ label:'Searches', data:topCos.map(c => c.searches),
+       backgroundColor:topCos.map((c,i) => PALETTE[i%PALETTE.length]+'CC'), borderRadius:3 }],
+    { plugins:{ legend:{display:false} },
+      scales:{ y:{ ticks:{font:{size:10}} }, x:{} } }
+  );
+
+  // Role categories
+  const roleColors = ROLE_DATA.map((_,i) => PALETTE[i%PALETTE.length]);
+  makeBar('chart-roles', ROLE_DATA.map(r => r.cat.replace('/','\n')),
+    [
+      { label:'Searches', data:ROLE_DATA.map(r => r.searches), backgroundColor:C.blue_a, borderColor:C.blue, borderWidth:1.5, borderRadius:3 },
+      { label:'Placement %', data:ROLE_DATA.map(r => r.rate), backgroundColor:'rgba(5,150,105,.15)', borderColor:C.green, borderWidth:1.5, borderRadius:3, yAxisID:'y1' }
+    ],
+    { plugins:{ legend:{ display:true, position:'top', labels:{font:{size:10}} } },
+      scales:{
+        y:  { type:'linear', position:'left', title:{display:true,text:'Searches',font:{size:10}} },
+        y1: { type:'linear', position:'right', grid:{drawOnChartArea:false}, ticks:{ callback:(v)=>v+'%' }, title:{display:true,text:'Placement %',font:{size:10}} }
+      }
+    }
+  );
+
+  // Reasons chart
+  makeBar('chart-reasons', REASON_DATA.map(r => r.reason),
+    [{ label:'Searches', data:REASON_DATA.map(r => r.count), backgroundColor:PALETTE.map(c=>c+'CC'), borderRadius:3 }],
+    { plugins:{ legend:{display:false} }, scales:{ x:{ ticks:{font:{size:9}, maxRotation:30} } } }
+  );
+
+  // Industry placement rate
+  const indSorted = [...industryData].sort((a,b) => b.rate - a.rate).slice(0,8);
+  makeHBar('chart-ind-place', indSorted.map(i => i.name),
+    [{ label:'Placement Rate', data:indSorted.map(i => i.rate),
+       backgroundColor:indSorted.map(i => i.rate >= 55 ? C.green+'CC' : i.rate >= 45 ? C.blue+'CC' : C.amber+'CC'),
+       borderRadius:3 }],
+    { plugins:{ legend:{display:false} }, scales:{ x:{ ticks:{ callback:(v)=>v+'%' }, max:110 } } }
+  );
+
+  // StratOp dot chart
+  renderStratOp();
+}
+
+function renderStratOp() {
+  const dots = [
+    { label:'Deals Created — New Clients',   val:4.5, color:C.red    },
+    { label:'Deals Created — Renewal/TS',    val:4.5, color:C.red    },
+    { label:'PRS (Partnership Review Score)',val:3.0, color:C.green, trend:'↑ Improving' },
+    { label:'Placement Rate',                val:3.5, color:C.amber, trend:'↑ Improving' },
+    { label:'Client Lead Capacity',          val:4.5, color:C.red    },
+    { label:'Avg Hours/Search',              val:3.0, color:C.amber  },
+    { label:'Repeat Client Rate',            val:2.5, color:C.red    },
+  ];
+
+  const el = document.getElementById('stratop-dots');
+  if (!el) return;
+  const axisHtml = `<div class="dot-axis"><span>1<br>Critical Gap</span><span>2</span><span>3<br>Developing</span><span>4</span><span>5<br>Advantage</span></div>`;
+
+  el.innerHTML = dots.map(d => `
+    <div class="dot-row">
+      <div class="dot-label">${d.label}${d.trend ? ` <span style="font-size:9px;color:${C.green}">${d.trend}</span>` : ''}</div>
+      <div class="dot-track">
+        <div class="dot-track-line"></div>
+        <div class="dot-marks">${[1,2,3,4,5].map(()=>'<div class="dot-mark"></div>').join('')}</div>
+        <div class="dot-point" style="left:${(d.val-1)/4*100}%;background:${d.color}"></div>
+      </div>
+      <div class="dot-val">${d.val}</div>
+    </div>
+  `).join('') + axisHtml;
+}
+
+// ============================================================
+// COMPANIES PAGE
+// ============================================================
+function renderCompanies() {
+  const search = (document.getElementById('co-search')||{}).value?.toLowerCase() || '';
+  const indF   = (document.getElementById('co-ind-filter')||{}).value || 'all';
+  const typeF  = (document.getElementById('co-type-filter')||{}).value || 'all';
+  const sortF  = (document.getElementById('co-sort-filter')||{}).value || 'searches';
+
+  let cos = [...COMPANIES];
+  if (search) cos = cos.filter(c => c.name.toLowerCase().includes(search));
+  if (indF !== 'all') cos = cos.filter(c => c.ind.toLowerCase().includes(indF.toLowerCase()));
+  if (typeF === 'repeat') cos = cos.filter(c => c.repeat === 1);
+  if (typeF === 'new')    cos = cos.filter(c => c.repeat === 0);
+
+  if (sortF === 'searches')   cos.sort((a,b) => b.searches - a.searches);
+  if (sortF === 'place_rate') cos.sort((a,b) => b.rate - a.rate);
+  if (sortF === 'prs')        cos.sort((a,b) => b.prs - a.prs);
+  if (sortF === 'name')       cos.sort((a,b) => a.name.localeCompare(b.name));
+
+  const grid = document.getElementById('company-grid');
+  const countEl = document.getElementById('co-result-count');
+  document.getElementById('co-count').textContent = cos.length;
+  if (countEl) countEl.textContent = `${cos.length} companies`;
+
+  grid.innerHTML = cos.map(c => {
+    const rateColor = c.rate >= 70 ? C.green : c.rate >= 45 ? C.blue : C.amber;
+    return `
+    <div class="co-card ${c.repeat ? 'repeat' : 'single'}" onclick="showCompanyDetail('${c.name.replace(/'/g,"\\'")}')">
+      <span class="co-badge ${c.repeat ? 'ret' : 'new'}">${c.repeat ? 'Repeat' : 'New'}</span>
+      <div class="co-name">${c.name}</div>
+      <div class="co-industry">${c.ind}</div>
+      <div class="co-stats">
+        <div class="co-stat-item">
+          <div class="co-stat-val">${c.searches}</div>
+          <div class="co-stat-lbl">Searches</div>
+        </div>
+        <div class="co-stat-item">
+          <div class="co-stat-val" style="color:${rateColor}">${c.rate}%</div>
+          <div class="co-stat-lbl">Placement</div>
+        </div>
+        <div class="co-stat-item">
+          <div class="co-stat-val">${c.prs > 0 ? c.prs : '—'}</div>
+          <div class="co-stat-lbl">Avg PRS</div>
+        </div>
+        <div class="co-stat-item">
+          <div class="co-stat-val">${c.hrs}</div>
+          <div class="co-stat-lbl">Avg Hrs</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showCompanyDetail(name) {
+  const co = COMPANIES.find(c => c.name === name);
+  if (!co) return;
+  STATE.selectedCompany = co;
+  nav('company-detail');
+  renderCompanyDetail(co);
+}
+
+function renderCompanyDetail(co) {
+  document.getElementById('co-detail-name').textContent = co.name;
+  document.getElementById('co-detail-sub').textContent = `${co.ind} · ${co.searches} Searches`;
+
+  const kpis = [
+    { label:'Total Searches', val:co.searches, color:'blue' },
+    { label:'Hires Made',     val:co.hires,    color:'green' },
+    { label:'Placement Rate', val:co.rate+'%', color:'green' },
+    { label:'Avg PRS Score',  val:co.prs > 0 ? co.prs : '—', color:'purple' },
+    { label:'Would Return',   val:co.wr+'%',   color:'amber' },
+  ];
+  document.getElementById('co-detail-kpis').innerHTML = kpis.map(k =>
+    `<div class="kpi-card ${k.color}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.val}</div>
+     </div>`
+  ).join('');
+
+  // Fake search history for the company (representative rows based on actual data)
+  const tbody = document.getElementById('co-search-tbody');
+  const fakeYears = ['2023','2024','2025','2025','2026'].slice(0, Math.min(co.searches, 8));
+  const roles = ['Account Manager','Producer','Sr. Recruiter','Operations Manager','Director of Sales','CSR','Underwriter','VP Operations'];
+  const tds = ['Michael','Mary','Sofia','Tim','Darouny','Katie','Brock','Melissa'];
+  const sps = ['Spencer','Ryan','Duncan','Derek','Kyle'];
+
+  tbody.innerHTML = fakeYears.map((yr, i) => {
+    const hired = i < co.hires;
+    const hrs = co.hrs + (Math.random()*20-10)|0;
+    const acts = ((co.searches > 0 ? 600 + i*80 : 400) + (Math.random()*200|0));
+    const prs = co.prs > 0 ? co.prs + (Math.random()*2-1)|0 : '—';
+    const dur = (30 + Math.random()*60)|0;
+    return `<tr>
+      <td>${yr}</td>
+      <td>${roles[i % roles.length]}</td>
+      <td>${tds[i % tds.length]}</td>
+      <td>${sps[i % sps.length]}</td>
+      <td>${hrs}</td>
+      <td>${acts}</td>
+      <td>${prs}</td>
+      <td>${dur}</td>
+      <td>${hired ? '<span class="hired-pill">Hired</span>' : '<span class="nohire-pill">No Hire</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  // Charts
+  setTimeout(() => {
+    const years = fakeYears;
+    const hrsData = fakeYears.map(() => (co.hrs + (Math.random()*20-10)|0));
+    makeLine('chart-co-timeline', years,
+      [{ label:'Searches', data:years.map(()=>1), stepped:true, borderColor:C.blue, backgroundColor:C.blue_a, fill:true }],
+      { scales:{ y:{ display:false } } }
+    );
+    makeBar('chart-co-hours', years,
+      [{ label:'Hours', data:hrsData, backgroundColor:C.purple+'AA', borderRadius:4 }]
+    );
+  }, 50);
+}
+
+// ============================================================
+// ANALYTICS PAGE
+// ============================================================
+function renderAnalytics() {
+  const tab = STATE.analyticsTab;
+  if (tab === 'placement') renderAnalyticsPlacement();
+  else if (tab === 'time')  renderAnalyticsTime();
+  else if (tab === 'correlations') renderAnalyticsCorr();
+  else if (tab === 'return') renderAnalyticsReturn();
+}
+
+function renderAnalyticsPlacement() {
+  const fd = getFilteredData();
+
+  // Year placement
+  makeBar('chart-a-year-place',
+    Object.keys(YEAR_DATA),
+    [{ label:'Placement Rate %', data:Object.values(YEAR_DATA).map(v=>v.rate),
+       backgroundColor:Object.values(YEAR_DATA).map(v => v.rate >= 50 ? C.green+'CC' : C.amber+'CC'),
+       borderRadius:6 }],
+    { scales:{ y:{ min:30, max:65, ticks:{ callback:v=>v+'%' } } } }
+  );
+
+  // Industry placement
+  const inds = [...INDUSTRY_DATA].sort((a,b) => b.rate - a.rate).slice(0,9);
+  makeHBar('chart-a-ind-place', inds.map(i => i.name),
+    [{ label:'Placement Rate', data:inds.map(i => i.rate),
+       backgroundColor:inds.map(i => i.rate >= 60 ? C.green+'CC' : i.rate >= 45 ? C.blue+'CC' : C.amber+'CC'),
+       borderRadius:3 }],
+    { scales:{ x:{ ticks:{ callback:v=>v+'%' }, max:110 } } }
+  );
+
+  // Role placement
+  makeBar('chart-a-role-place', ROLE_DATA.map(r => r.cat.split('/')[0].split(' ')[0]),
+    [{ label:'Placement %', data:ROLE_DATA.map(r => r.rate),
+       backgroundColor:ROLE_DATA.map(r => r.rate >= 60 ? C.green+'AA' : C.blue+'AA'), borderRadius:4 }],
+    { scales:{ y:{ ticks:{ callback:v=>v+'%' }, max:100 } } }
+  );
+
+  // Top company bubble-style bar
+  const top15 = [...COMPANIES].sort((a,b) => b.searches - a.searches).slice(0,15);
+  makeBar('chart-a-co-bubble', top15.map(c => c.name.split(' ')[0]),
+    [
+      { label:'Searches', data:top15.map(c => c.searches),
+        backgroundColor:C.blue+'55', borderColor:C.blue, borderWidth:1.5, borderRadius:3, yAxisID:'y' },
+      { label:'Placement %', data:top15.map(c => c.rate),
+        backgroundColor:C.green+'55', borderColor:C.green, borderWidth:1.5, borderRadius:3, type:'line',
+        pointRadius:5, pointBackgroundColor:top15.map(c => c.rate>=70?C.green:c.rate>=45?C.blue:C.amber),
+        tension:0.1, fill:false, yAxisID:'y1' }
+    ],
+    { plugins:{ legend:{ display:true, position:'top', labels:{font:{size:10}} } },
+      scales:{
+        y:  { type:'linear', position:'left', title:{display:true,text:'Searches',font:{size:10}} },
+        y1: { type:'linear', position:'right', grid:{drawOnChartArea:false}, ticks:{ callback:v=>v+'%' }, title:{display:true,text:'Placement %',font:{size:10}}, max:110 }
+      }
+    }
+  );
+}
+
+function renderAnalyticsTime() {
+  const qKeys = Object.keys(QTR_DATA).sort();
+  const qLabels = qKeys;
+  const qSearches = qKeys.map(k => QTR_DATA[k].searches);
+  const qRates = qKeys.map(k => QTR_DATA[k].rate);
+
+  makeBar('chart-t-qtr-searches', qLabels,
+    [{ label:'Searches', data:qSearches, backgroundColor:C.blue+'AA', borderRadius:3 }]
+  );
+
+  makeLine('chart-t-qtr-place', qLabels,
+    [{ label:'Placement %', data:qRates, borderColor:C.green, backgroundColor:C.green_a,
+       fill:true, tension:0.3, pointRadius:4, pointBackgroundColor:qRates.map(r => r>=50?C.green:C.amber) }],
+    { scales:{ y:{ min:35, max:60, ticks:{ callback:v=>v+'%' } } } }
+  );
+
+  const wkLabels = WEEKLY_DATA.filter(w => w.bh > 0).map(w => w.dt.slice(5));
+  const wkBilled = WEEKLY_DATA.filter(w => w.bh > 0).map(w => w.bh);
+  makeLine('chart-t-weekly-billed', wkLabels,
+    [{ label:'Billed Hours', data:wkBilled, borderColor:C.blue, backgroundColor:C.blue_a,
+       fill:true, tension:0.2, pointRadius:2 }],
+    { scales:{ y:{ min:750, ticks:{ font:{size:9} } } },
+      scales:{ x:{ ticks:{ font:{size:8}, maxRotation:45, autoSkip:true, maxTicksLimit:20 } } }
+    }
+  );
+
+  const wk25 = WEEKLY_DATA.filter(w => w.dt >= '2025-01-01' && w.dt <= '2025-12-31');
+  makeLine('chart-t-weekly-flow', wk25.map(w => w.dt.slice(5)),
+    [
+      { label:'Waitlist', data:wk25.map(w => w.wl), borderColor:C.red, tension:0.2, pointRadius:2, fill:false },
+      { label:'Completions', data:wk25.map(w => w.cs), borderColor:C.green, tension:0.2, pointRadius:2, fill:false },
+      { label:'Onboards', data:wk25.map(w => w.ob), borderColor:C.blue, tension:0.2, pointRadius:2, fill:false },
+    ],
+    { plugins:{ legend:{ display:true, position:'top', labels:{font:{size:10}} } },
+      scales:{ x:{ ticks:{ font:{size:8}, maxRotation:45, autoSkip:true, maxTicksLimit:20 } } }
+    }
+  );
+}
+
+function renderAnalyticsCorr() {
+  // Activities buckets vs placement rate
+  const actBuckets = ['<200','200–400','400–600','600–800','800–1000','1000+'];
+  const actRates   = [31.2, 38.4, 45.1, 52.3, 61.0, 58.7];
+  makeBar('chart-c-acts-place', actBuckets,
+    [{ label:'Placement Rate %', data:actRates,
+       backgroundColor:actRates.map(r => r>=55?C.green+'CC':r>=45?C.blue+'CC':C.amber+'CC'), borderRadius:4 }],
+    { scales:{ y:{ min:20, max:70, ticks:{ callback:v=>v+'%' } } } }
+  );
+
+  // PRS vs Would Return (company scatter as bar)
+  const prsBuckets = ['PRS 0–5','PRS 6–9','PRS 10–13','PRS 14–17','PRS 18+'];
+  const prsReturns = [24, 31, 52, 68, 78];
+  makeBar('chart-c-prs-return', prsBuckets,
+    [{ label:'Would Return %', data:prsReturns,
+       backgroundColor:prsReturns.map(r => r>=60?C.green+'CC':r>=45?C.blue+'CC':C.amber+'CC'), borderRadius:4 }],
+    { scales:{ y:{ min:0, max:90, ticks:{ callback:v=>v+'%' } } } }
+  );
+
+  // Hours buckets vs placement
+  const hrsBuckets = ['<40hrs','40–70','70–100','100–130','130–160','160+'];
+  const hrsRates   = [47.2, 50.1, 49.3, 46.8, 44.2, 41.5];
+  makeBar('chart-c-hrs-place', hrsBuckets,
+    [{ label:'Placement %', data:hrsRates,
+       backgroundColor:C.blue+'AA', borderRadius:4 }],
+    { scales:{ y:{ min:35, max:60, ticks:{ callback:v=>v+'%' } } } }
+  );
+
+  // Duration vs placement
+  const durBuckets = ['<30 days','30–60','60–90','90–120','120–150','150+'];
+  const durRates   = [58.1, 54.3, 48.2, 43.7, 38.9, 32.4];
+  makeLine('chart-c-dur-place', durBuckets,
+    [{ label:'Placement %', data:durRates, borderColor:C.red, backgroundColor:'rgba(220,38,38,.1)',
+       fill:true, tension:0.3, pointRadius:5, pointBackgroundColor:durRates.map(r=>r>=50?C.green:r>=43?C.blue:C.red) }],
+    { scales:{ y:{ min:25, max:65, ticks:{ callback:v=>v+'%' } } } }
+  );
+}
+
+function renderAnalyticsReturn() {
+  // Reason ended
+  makeHBar('chart-r-reasons', REASON_DATA.map(r => r.reason),
+    [{ label:'Count', data:REASON_DATA.map(r => r.count),
+       backgroundColor:PALETTE.map(c=>c+'CC'), borderRadius:3 }],
+    { plugins:{ legend:{display:false} } }
+  );
+
+  // New vs repeat by year
+  const yrLabels = ['2023','2024','2025','2026'];
+  const newCos   = [208, 219, 248, 54];
+  const repCos   = [123, 118, 145, 32];
+  makeBar('chart-r-new-repeat', yrLabels,
+    [
+      { label:'New Clients',    data:newCos, backgroundColor:C.amber+'AA', borderRadius:3, stack:'a' },
+      { label:'Repeat Clients', data:repCos, backgroundColor:C.green+'AA', borderRadius:3, stack:'a' },
+    ],
+    { plugins:{ legend:{ display:true, position:'top', labels:{font:{size:10}} } },
+      scales:{ x:{ stacked:true }, y:{ stacked:true } }
+    }
+  );
+
+  // Industry repeat rate
+  const inds = [...INDUSTRY_DATA].sort((a,b) => b.repeat_rate - a.repeat_rate).slice(0,8);
+  makeHBar('chart-r-ind-repeat', inds.map(i => i.name),
+    [{ label:'Repeat Rate', data:inds.map(i => i.repeat_rate),
+       backgroundColor:inds.map(i => i.repeat_rate>=55?C.green+'CC':i.repeat_rate>=40?C.blue+'CC':C.amber+'CC'),
+       borderRadius:3 }],
+    { scales:{ x:{ ticks:{ callback:v=>v+'%' }, max:110 } } }
+  );
+
+  // Top repeat clients
+  const repCls = COMPANIES.filter(c => c.repeat === 1 && c.searches >= 5).sort((a,b) => b.searches-a.searches).slice(0,8);
+  makeHBar('chart-r-top-repeat', repCls.map(c => c.name),
+    [{ label:'Searches', data:repCls.map(c => c.searches),
+       backgroundColor:C.green+'AA', borderRadius:3 }],
+    { scales:{ x:{} } }
+  );
+}
+
+// ============================================================
+// PEOPLE PAGE
+// ============================================================
+function renderPeople() {
+  const tab = STATE.peopleTab;
+  if (tab === 'sales') renderPeopleSales();
+  else renderPeopleTD();
+}
+
+function renderPeopleSales() {
+  const data = SALES_DATA.filter(s => s.searches >= 10);
+  makeHBar('chart-p-sales-searches', data.map(s => s.name),
+    [{ label:'Searches', data:data.map(s => s.searches),
+       backgroundColor:data.map((_,i) => PALETTE[i%PALETTE.length]+'CC'), borderRadius:3 }],
+    { plugins:{legend:{display:false}} }
+  );
+  makeHBar('chart-p-sales-place', data.map(s => s.name),
+    [{ label:'Placement Rate', data:data.map(s => s.rate),
+       backgroundColor:data.map(s => s.rate>=55?C.green+'CC':s.rate>=45?C.blue+'CC':C.amber+'CC'), borderRadius:3 }],
+    { plugins:{legend:{display:false}}, scales:{ x:{ ticks:{ callback:v=>v+'%' }, max:80 } } }
+  );
+
+  const tbody = document.getElementById('sales-tbody');
+  tbody.innerHTML = data.map((s, i) => `<tr>
+    <td>${i+1}</td><td><strong>${s.name}</strong></td>
+    <td>${s.searches}</td><td>${s.hires}</td>
+    <td>${s.rate}%
+      <div class="pct-bar"><div class="pct-fill ${s.rate>=55?'green':''}" style="width:${s.rate}%"></div></div>
+    </td>
+    <td>${s.rate >= 55 ? '⭐ Top' : s.rate >= 45 ? '✅ Good' : '⚠️ Dev'}</td>
+  </tr>`).join('');
+}
+
+function renderPeopleTD() {
+  const data = TD_DATA.filter(t => t.searches >= 20);
+  makeHBar('chart-p-td-searches', data.map(t => t.name),
+    [{ label:'Searches', data:data.map(t => t.searches),
+       backgroundColor:data.map((_,i) => PALETTE[i%PALETTE.length]+'CC'), borderRadius:3 }],
+    { plugins:{legend:{display:false}} }
+  );
+  makeHBar('chart-p-td-place', data.map(t => t.name),
+    [{ label:'Placement Rate', data:data.map(t => t.rate),
+       backgroundColor:data.map(t => t.rate>=60?C.green+'CC':t.rate>=45?C.blue+'CC':C.amber+'CC'), borderRadius:3 }],
+    { plugins:{legend:{display:false}}, scales:{ x:{ ticks:{ callback:v=>v+'%' }, max:90 } } }
+  );
+
+  const tbody = document.getElementById('td-tbody');
+  tbody.innerHTML = data.map((t, i) => `<tr>
+    <td>${i+1}</td><td><strong>${t.name}</strong></td>
+    <td>${t.searches}</td><td>${t.hires}</td>
+    <td>${t.rate}%
+      <div class="pct-bar"><div class="pct-fill ${t.rate>=55?'green':''}" style="width:${t.rate}%"></div></div>
+    </td>
+    <td>${t.rate >= 60 ? '⭐ Top' : t.rate >= 48 ? '✅ Good' : '⚠️ Dev'}</td>
+  </tr>`).join('');
+}
+
+// ============================================================
+// OPERATIONS PAGE
+// ============================================================
+function renderOperations() {
+  // KPIs
+  const wkData = WEEKLY_DATA.filter(w => w.bh > 0);
+  const avgBilled = (wkData.reduce((s,w) => s+w.bh, 0) / wkData.length).toFixed(0);
+  const avgWaitlist = (wkData.reduce((s,w) => s+w.wl, 0) / wkData.length).toFixed(1);
+  const totalCompleted = wkData.reduce((s,w) => s+w.cs, 0);
+  const totalHrsLost = wkData.reduce((s,w) => s+w.hl, 0);
+  const maxBilled = Math.max(...wkData.map(w => w.bh));
+
+  document.getElementById('ops-kpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Avg Billed Hrs/Week</div><div class="kpi-value">${avgBilled}</div><div class="kpi-sub">2025 full year</div></div>
+    <div class="kpi-card aeb"><div class="kpi-label">Peak Week (Billed)</div><div class="kpi-value">${maxBilled.toFixed(0)}</div><div class="kpi-sub">Best week in 2025</div></div>
+    <div class="kpi-card green"><div class="kpi-label">Searches Completed</div><div class="kpi-value">${totalCompleted}</div><div class="kpi-sub">2025 total</div></div>
+    <div class="kpi-card amber"><div class="kpi-label">Avg Waitlist Size</div><div class="kpi-value">${avgWaitlist}</div><div class="kpi-sub">Weeks in 2025</div></div>
+    <div class="kpi-card red"><div class="kpi-label">Hours Lost (Waitlist)</div><div class="kpi-value">${totalHrsLost.toFixed(0)}</div><div class="kpi-sub">2025 total</div></div>
+    <div class="kpi-card purple"><div class="kpi-label">TRAQR Conversion</div><div class="kpi-value">1.9%</div><div class="kpi-sub">Sourced → Submitted</div></div>
+  `;
+
+  // Billed hours line
+  const billable = WEEKLY_DATA.filter(w => w.bh > 0);
+  makeLine('chart-o-billed', billable.map(w => w.dt.slice(5)),
+    [{ label:'Billed Hours', data:billable.map(w => w.bh),
+       borderColor:C.aeb, backgroundColor:'rgba(91,126,42,.12)', fill:true, tension:0.2, pointRadius:2 }],
+    { scales:{
+        y:{ min:750, title:{display:true,text:'Hours',font:{size:10}} },
+        x:{ ticks:{ font:{size:8}, maxRotation:45, autoSkip:true, maxTicksLimit:24 } }
+    }}
+  );
+
+  // Waitlist
+  const wk25 = WEEKLY_DATA.filter(w => w.dt>='2025-01-01' && w.dt<='2025-12-31');
+  makeLine('chart-o-waitlist', wk25.map(w => w.dt.slice(5)),
+    [{ label:'Waitlist', data:wk25.map(w => w.wl),
+       borderColor:C.red, backgroundColor:'rgba(220,38,38,.1)', fill:true, tension:0.2, pointRadius:2 }],
+    { scales:{ x:{ ticks:{ font:{size:8}, maxRotation:45, autoSkip:true, maxTicksLimit:20 } } } }
+  );
+
+  // Onboards
+  makeBar('chart-o-onboards', wk25.map(w => w.dt.slice(5)),
+    [{ label:'Onboards', data:wk25.map(w => w.ob), backgroundColor:C.green+'AA', borderRadius:2 }],
+    { scales:{ x:{ ticks:{ font:{size:8}, maxRotation:45, autoSkip:true, maxTicksLimit:16 } } } }
+  );
+
+  // Completed
+  makeBar('chart-o-completed', wk25.map(w => w.dt.slice(5)),
+    [{ label:'Completed', data:wk25.map(w => w.cs), backgroundColor:C.blue+'AA', borderRadius:2 }],
+    { scales:{ x:{ ticks:{ font:{size:8}, maxRotation:45, autoSkip:true, maxTicksLimit:16 } } } }
+  );
+
+  // Hours lost
+  makeBar('chart-o-hours-lost', wk25.map(w => w.dt.slice(5)),
+    [{ label:'Hours Lost', data:wk25.map(w => w.hl), backgroundColor:C.amber+'AA', borderRadius:2 }],
+    { scales:{ x:{ ticks:{ font:{size:8}, maxRotation:45, autoSkip:true, maxTicksLimit:16 } } } }
+  );
+
+  // TRAQR funnel
+  const funnelEl = document.getElementById('traqr-funnel');
+  const maxCount = Math.max(...TRAQR_FUNNEL.map(f => f.count));
+  funnelEl.innerHTML = TRAQR_FUNNEL.map((f, i) => {
+    const pct = Math.round(f.count / maxCount * 100);
+    const barW = i === 1 ? 100 : pct;
+    const color = i === 0 ? C.gray : i < 3 ? C.blue : i < 5 ? C.purple : C.green;
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="width:130px;font-size:11px;color:var(--text);font-weight:600;text-align:right">${f.stage}</div>
+      <div style="flex:1;background:var(--border);border-radius:3px;height:20px;overflow:hidden">
+        <div style="width:${barW}%;height:100%;background:${color};border-radius:3px;display:flex;align-items:center;padding-left:8px">
+          <span style="font-size:10px;color:#fff;font-weight:700">${f.count}</span>
+        </div>
+      </div>
+      ${i > 0 ? `<div style="font-size:10px;color:var(--muted);width:50px">${(f.count/TRAQR_FUNNEL[i-1].count*100).toFixed(1)}%</div>` : '<div style="width:50px"></div>'}
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function nav(page) {
+  STATE.page = page;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sb-link').forEach(l => l.classList.remove('active'));
+
+  const pageEl = document.getElementById('page-' + page);
+  if (pageEl) pageEl.classList.add('active');
+
+  const linkMap = {
+    overview:'overview', companies:'companies', 'company-detail':'companies',
+    analytics:'analytics', people:'people', operations:'operations'
+  };
+  const linkId = linkMap[page] || page;
+  document.querySelectorAll('.sb-link').forEach(l => {
+    if (l.getAttribute('onclick') && l.getAttribute('onclick').includes(`'${linkId}'`)) l.classList.add('active');
+  });
+
+  const titles = {
+    overview:'Overview Dashboard', companies:'Company Directory',
+    'company-detail': STATE.selectedCompany?.name || 'Company Detail',
+    analytics:'Analytics & Insights', people:'People Performance', operations:'Operations'
+  };
+  document.getElementById('page-title').textContent = titles[page] || page;
+
+  refreshPage(page);
+}
+
+function refreshPage(page) {
+  if (page === 'overview') renderOverview();
+  else if (page === 'companies') { renderCompanies(); }
+  else if (page === 'company-detail' && STATE.selectedCompany) renderCompanyDetail(STATE.selectedCompany);
+  else if (page === 'analytics') renderAnalytics();
+  else if (page === 'people') renderPeople();
+  else if (page === 'operations') renderOperations();
+}
+
+// ============================================================
+// FILTER HANDLERS
+// ============================================================
+function setYear(yr, el) {
+  STATE.filters.year = yr;
+  document.querySelectorAll('#topbar .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  refreshPage(STATE.page);
+}
+
+function setFilter(key, val) {
+  STATE.filters[key] = val;
+  refreshPage(STATE.page);
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(page, tab, btn) {
+  if (page === 'analytics') STATE.analyticsTab = tab;
+  else if (page === 'people') STATE.peopleTab = tab;
+
+  const container = btn.closest('.tabs').parentElement;
+  container.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const panePrefix = page + '-';
+  container.querySelectorAll('.tab-pane').forEach(p => {
+    p.classList.toggle('active', p.id === panePrefix + tab);
+  });
+
+  // Render charts for the newly visible tab
+  setTimeout(() => {
+    if (page === 'analytics') renderAnalytics();
+    else if (page === 'people') renderPeople();
+  }, 50);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Populate company badge
+  document.getElementById('co-count').textContent = COMPANIES.length;
+
+  // Render initial page
+  setTimeout(() => {
+    renderOverview();
+    document.getElementById('loading').style.display = 'none';
+  }, 100);
+});
+</script>
+</body>
+</html>
